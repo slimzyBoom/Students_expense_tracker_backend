@@ -1,0 +1,18 @@
+import { Router } from "express";
+import auth from "./auth.routes";
+import accounts from "./account.routes";
+import categories from "./category.routes";
+import transactions from "./transaction.routes";
+import statements from "./statement.routes";
+import budgets from "./budget.routes";
+import analytics from "./analytics.routes";
+import { authenticate } from "../middlewares/auth.middleware";
+const r = Router();
+r.use("/auth", auth);
+r.use("/accounts", authenticate, accounts);
+r.use("/", authenticate, categories);
+r.use("/transactions", authenticate, transactions);
+r.use("/statements", authenticate, statements);
+r.use("/budgets", authenticate, budgets);
+r.use("/analytics", authenticate, analytics);
+export default r;
