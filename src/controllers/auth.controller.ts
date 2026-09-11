@@ -17,11 +17,14 @@ const present = (x: any) => ({
 });
 export const register: RequestHandler = async (req, res, next) => {
   try {
+    console.log("Register controller called")
     const body = req.body;
     const x = await authService.register(body.name, body.email, body.password);
+    console.log("Register service done")
     res.cookie("refreshToken", x.refreshToken, cookie);
     ok(res, { user: present(x.user), accessToken: x.accessToken }, 201);
   } catch (e) {
+    console.log("Error occured");
     next(e);
   }
 };

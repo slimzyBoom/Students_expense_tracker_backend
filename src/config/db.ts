@@ -48,7 +48,7 @@ export const connectDatabase = async () => {
       bufferCommands: false,
     });
 
-    await seedDefaultCategories();
+    // await seedDefaultCategories();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ message: "Failed to connect to MongoDB", error: message });

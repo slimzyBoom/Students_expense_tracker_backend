@@ -6,5 +6,13 @@ export const accountSchema = z
     current_balance: z.number().finite().default(0),
   })
   .strict();
+export const accountUpdateSchema = z
+  .object({
+    cash_balance: z.number().optional(),
+    bank_balance: z.number().optional(),
+  })
+  .strict();
+
 
 export type AccountInput = z.infer<typeof accountSchema>;
+export type AccountUpdateInput = z.infer<typeof accountUpdateSchema>;

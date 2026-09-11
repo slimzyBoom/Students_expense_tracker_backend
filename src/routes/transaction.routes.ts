@@ -12,7 +12,6 @@ const r = Router();
 r.get("/", validateQuery(transactionQuery), c.listTransactions);
 r.post("/cash", validateBody(cashEntrySchema), c.createCashEntry);
 r.post("/cash/daily-log", validateBody(dailyCashLogSchema), c.createDailyCashLog);
-r.post("/", validateBody(transactionSchema), c.createTransaction);
 r.put(
   "/:id",
   validateParams(idParam),

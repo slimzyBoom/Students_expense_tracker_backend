@@ -3,6 +3,8 @@ import { CategoryModel } from "../models/category.model";
 import { CategoryRuleModel } from "../models/categoryRule.model";
 import { TransactionIdParam } from "../validations/transaction.validation";
 import { ok } from "../utils/apiResponse";
+import { AppError } from "../middlewares/error.middleware";
+import { Types } from "mongoose";
 type CategoryInput = {
   name: string;
   type: "INCOME" | "EXPENSE";
@@ -15,13 +17,16 @@ type RuleInput = {
   priority?: number;
 };
 export const listCategories: RequestHandler = async (req, res, next) => {
+  const userId = req.user?.id;
   try {
-    ok(
-      res,
-      await CategoryModel.find({
-        $or: [{ user_id: req.user!.id }, { user_id: null }],
-      }).sort({ name: 1 }),
-    );
+    const categories = await CategoryModel.find({
+      $or: [{ user_id: userId }, { user_id: null }],
+    }).sort({ name: 1 });
+    console.log("Categories found:", categories.length);
+    if (!categories || categories.length === 0) {
+      throw new AppError("No categories found", 404);
+    }
+    ok(res, categories);
   } catch (e) {
     next(e);
   }
@@ -95,5 +100,23 @@ export const deleteRule: RequestHandler = async (req, res, next) => {
     res.status(204).send();
   } catch (e) {
     next(e);
+  }
+};
+
+export const insertRules = async (
+  rules: RuleInput[],
+  userId: Types.ObjectId,
+) => {
+  try {
+    await CategoryRuleModel.insertMany(
+      rules.map((r) => ({
+        ...r,
+        user_id: userId,
+        keyword: r.keyword.toLowerCase(),
+      })),
+      { ordered: false },
+    );
+  } catch (err) {
+    throw err;
   }
 };

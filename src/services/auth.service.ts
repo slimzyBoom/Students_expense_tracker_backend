@@ -4,6 +4,7 @@ import { UserModel } from "../models/user.model";
 import { AccountModel } from "../models/account.model";
 import { DEFAULT_ACCOUNT_KEYS } from "../models/account.model";
 import { RefreshTokenModel } from "../models/refreshToken.model";
+import { AppError } from "../middlewares/error.middleware";
 import {
   createAccessToken,
   createRefreshToken,
@@ -34,43 +35,53 @@ const issue = async (user: { _id: Types.ObjectId; email: string }) => {
 
 export const authService = {
   async register(name: string, email: string, password: string) {
-    if (await UserModel.exists({ email: email.toLowerCase() })) {
-      const e = new Error("Email already registered");
-      (e as any).statusCode = 409;
-      throw e;
+    if (await UserModel.exists({ email })) {
+      throw new AppError("Email already registered", 409);
     }
-    const password_hash = await bcrypt.hash(password, 12);
-    const session = await mongoose.startSession();
-    try {
-      let createdUser: any;
-      await session.withTransaction(async () => {
-        const users = await UserModel.create(
-          [{ name, email, password_hash }],
-          { session },
-        );
-        createdUser = users[0];
 
-        await AccountModel.create(
+    const password_hash = await bcrypt.hash(password, 12);
+
+    const session = await mongoose.startSession();
+
+    try {
+      const newUser = await session.withTransaction(async () => {
+        const user = new UserModel({
+          name,
+          email,
+          password_hash,
+        });
+
+        await user.save({ session })
+
+        const accounts = await AccountModel.create(
           [
             {
-              user_id: createdUser._id,
+              user_id: user._id,
               key: DEFAULT_ACCOUNT_KEYS.CASH_WALLET,
               name: "Cash Wallet",
               type: "CASH",
             },
             {
-              user_id: createdUser._id,
+              user_id: user._id,
               key: DEFAULT_ACCOUNT_KEYS.MAIN_BANK_ACCOUNT,
               name: "Main Bank Account",
               type: "BANK",
             },
           ],
-          { session },
+          { session, ordered: true },
         );
+
+        return user;
       });
 
-      const tokens = await issue(createdUser);
-      return { user: createdUser, ...tokens };
+      const tokens = await issue(newUser);
+
+      return {
+        user: newUser,
+        ...tokens,
+      };
+    } catch (error) {
+      throw error;
     } finally {
       await session.endSession();
     }
@@ -78,9 +89,7 @@ export const authService = {
   async login(email: string, password: string) {
     const user = await UserModel.findOne({ email: email.toLowerCase() });
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-      const e = new Error("Invalid email or password");
-      (e as any).statusCode = 401;
-      throw e;
+      throw new AppError("Invalid email or password", 401);
     }
     return { user, ...(await issue(user)) };
   },

@@ -43,5 +43,5 @@ const schema = new Schema(
 schema.index({ user_id: 1, transaction_date: 1 });
 schema.index({ user_id: 1, category_id: 1 });
 schema.index({ user_id: 1, import_hash: 1 }, { unique: true, sparse: true });
-export type Transaction = InferSchemaType<typeof schema>;
+export type TransactionType = InferSchemaType<typeof schema>;
 export const TransactionModel = model("Transaction", schema);

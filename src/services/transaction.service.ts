@@ -1,4 +1,5 @@
 import mongoose, { ClientSession, Types } from "mongoose";
+import { AppError } from "../middlewares/error.middleware";
 import { AccountModel } from "../models/account.model";
 import { TransactionModel } from "../models/transaction.model";
 import { accountService } from "./account.service";
@@ -18,10 +19,7 @@ type Input = {
   source?: "MANUAL" | "STATEMENT_IMPORT";
   import_hash?: string | null;
 };
-type BalanceInput = Pick<
-  Input,
-  "from_account_id" | "to_account_id" | "amount"
->;
+type BalanceInput = Pick<Input, "from_account_id" | "to_account_id" | "amount">;
 async function assertOwned(
   id: Types.ObjectId | undefined | null,
   userId: Types.ObjectId,
@@ -45,53 +43,50 @@ async function apply(
   await assertOwned(input.from_account_id, userId, session);
   await assertOwned(input.to_account_id, userId, session);
   const ops = [] as Promise<unknown>[];
-  if (input.from_account_id)
+    if (input.from_account_id) {
     ops.push(
       AccountModel.updateOne(
         { _id: input.from_account_id, user_id: userId },
-        { $inc: { current_balance: -sign * input.amount } },
+        { $inc: { current_balance: Number((-sign * input.amount).toFixed(2)) } },
         { session },
       ),
     );
-  if (input.to_account_id)
+  }
+  
+  // Increment destination account (Income or Transfer -> Destination)
+  if (input.to_account_id) {
     ops.push(
       AccountModel.updateOne(
         { _id: input.to_account_id, user_id: userId },
-        { $inc: { current_balance: sign * input.amount } },
+        { $inc: { current_balance: Number((sign * input.amount).toFixed(2)) } },
         { session },
       ),
     );
+  }
   await Promise.all(ops);
 }
 
-const policyError = (message: string) => {
-  const error = new Error(message);
-  (error as Error & { statusCode?: number }).statusCode = 403;
-  return error;
-};
-
-const hasId = (value: Types.ObjectId | string | null | undefined, id: Types.ObjectId) =>
-  value != null && String(value) === String(id);
+const hasId = (
+  value: Types.ObjectId | string | null | undefined,
+  id: Types.ObjectId,
+) => value != null && String(value) === String(id);
 
 function assertManualCashTransaction(
   input: Input,
   cashWalletId: Types.ObjectId,
 ) {
   if (input.type === "TRANSFER")
-    throw policyError("Manual transfers are not supported");
+    throw new AppError("Transfers cannot be recorded manually", 403);
   if (input.type === "INCOME") {
-    if (
-      input.from_account_id ||
-      !hasId(input.to_account_id, cashWalletId)
-    )
-      throw policyError("Manual income must be recorded in Cash Wallet");
+    if (input.from_account_id || !hasId(input.to_account_id, cashWalletId))
+      throw new AppError("Manual income must be recorded in Cash Wallet", 403);
     return;
   }
-  if (
-    input.to_account_id ||
-    !hasId(input.from_account_id, cashWalletId)
-  )
-    throw policyError("Manual expenses must be recorded from Cash Wallet");
+  if (input.to_account_id || !hasId(input.from_account_id, cashWalletId))
+    throw new AppError(
+      "Manual expenses must be recorded from Cash Wallet",
+      403,
+    );
 }
 
 async function createInSession(
@@ -113,10 +108,8 @@ export const transactionService = {
     try {
       let result;
       await s.withTransaction(async () => {
-        const { cashWallet, mainBankAccount } = await accountService.getDefaults(
-          userId,
-          s,
-        );
+        const { cashWallet, mainBankAccount } =
+          await accountService.getDefaults(userId, s);
         const transaction = { ...input, source: input.source ?? "MANUAL" };
         if (transaction.source === "MANUAL") {
           assertManualCashTransaction(transaction, cashWallet._id);
@@ -188,7 +181,10 @@ export const transactionService = {
           throw e;
         }
         if (old.source !== "MANUAL")
-          throw policyError("Imported bank transactions cannot be edited manually");
+          throw new AppError(
+            "Imported bank transactions cannot be edited manually",
+            403,
+          );
         const { cashWallet } = await accountService.getDefaults(userId, s);
         assertManualCashTransaction(input, cashWallet._id);
         await apply(old.toObject(), userId, -1, s);
@@ -218,7 +214,7 @@ export const transactionService = {
           throw e;
         }
         if (old.source !== "MANUAL")
-          throw policyError("Imported bank transactions cannot be deleted manually");
+          throw new AppError("Imported bank transactions cannot be deleted manually", 403);
         const { cashWallet } = await accountService.getDefaults(userId, s);
         assertManualCashTransaction(old.toObject(), cashWallet._id);
         await apply(old.toObject(), userId, -1, s);
@@ -248,4 +244,3 @@ export const transactionService = {
     return { items, total, page: q.page, limit: q.limit };
   },
 };
-

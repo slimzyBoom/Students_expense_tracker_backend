@@ -23,20 +23,7 @@ export const listTransactions: RequestHandler = async (req, res, next) => {
     next(e);
   }
 };
-export const createTransaction: RequestHandler = async (req, res, next) => {
-  try {
-    ok(
-      res,
-      await transactionService.create(
-        req.user!.id,
-        req.body,
-      ),
-      201,
-    );
-  } catch (e) {
-    next(e);
-  }
-};
+
 export const createCashEntry: RequestHandler = async (req, res, next) => {
   try {
     ok(

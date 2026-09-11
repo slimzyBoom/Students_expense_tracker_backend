@@ -8,3 +8,12 @@ export const getMyAccounts: RequestHandler = async (req, res, next) => {
     next(e);
   }
 };
+
+export const setStartingBalances: RequestHandler = async (req, res, next) => {
+  try {
+    const body = req.body as { bank_balance?: number; cash_balance?: number };
+    ok(res, await accountService.setStartingBalances(req.user!.id, body));
+  } catch (e) {
+    next(e);
+  }
+}

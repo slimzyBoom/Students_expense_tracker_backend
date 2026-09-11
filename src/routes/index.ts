@@ -10,7 +10,7 @@ import { authenticate } from "../middlewares/auth.middleware";
 const r = Router();
 r.use("/auth", auth);
 r.use("/accounts", authenticate, accounts);
-r.use("/", authenticate, categories);
+r.use("/categories", authenticate, categories);
 r.use("/transactions", authenticate, transactions);
 r.use("/statements", authenticate, statements);
 r.use("/budgets", authenticate, budgets);
